@@ -1,0 +1,161 @@
+//Declare any variables shared between functions here
+float myState[12];
+float drillLocation[3];
+float targetOrient[3];
+float zero[3];
+float analyzer[3];
+int counter;
+unsigned int state;
+unsigned int elapsedT;
+bool isBlue;
+bool isEven;
+bool isPenalty;
+int targetSquare;
+
+
+#define GETANALYZER 0
+#define LOCATE 1
+#define CHECK 2
+#define ANALYZE 3
+#define DRILL 4
+#define DROP 5
+void init(){
+    api.getMyZRState(myState);
+    state = GETANALYZER;
+    analyzer[0] = 0.30f;
+    analyzer[1] = -0.48f;
+    analyzer[2] = -0.16f;
+	//This function is called once when your code is first loaded.
+if (myState[1] < 0)
+{
+    isBlue = false;
+    DEBUG(("RED"));
+}
+else 
+{
+    isBlue = true;
+    DEBUG(("BLUE"));
+    analyzer[0] = -analyzer[0];
+    analyzer[1] = -analyzer[1];
+}
+
+	//IMPORTANT: make sure to set any variables that need an initial value.
+	//Do not assume variables will be set to 0 automatically!
+}
+
+void loop(){
+    api.getMyZRState(myState);
+    switch(state)
+    {
+        case GETANALYZER:
+        
+            moveByVelocity(analyzer,.27);
+            if ((game.hasAnalyzer() == 1) || (game.hasAnalyzer() == 2))
+            {
+                state = LOCATE;
+            }
+        break;
+        
+        case LOCATE:
+        
+            float maxZHeight[3];
+            float pos[2];
+            float vectorBetween[3];
+            float distance;
+            
+            maxZHeight[0] = myState[0];
+            maxZHeight[1] = myState[1];
+            maxZHeight[2] = 0.29f; //The surface has randomly assigned heights for each square, at heights of Z = [0.40, 0.48, 0.56, 0.64]m
+            
+            moveByVelocity(maxZHeight,0.125);
+            game.getTerrainHeight(pos);
+            DEBUG(("%f = pos",pos[2]));
+            
+            mathVecSubtract(vectorBetween,pos,myState,3);
+            distance = mathVecMagnitude(vectorBetween, 3);
+            DEBUG(("%f = distance", distance));
+            
+            if (isCloseEnough(myState,maxZHeight,0.00f,0.04f))
+            {
+                state = CHECK;
+            }
+        break;
+        
+        case CHECK:
+        
+            DEBUG(("CHECK"));
+
+    }
+	//This function is called once per second.  Use it to control the satellite.
+}
+
+
+
+
+bool isCloseEnough(float *myState, float *Target, float minDist, float maxDist) 
+{
+    bool result = false;
+    float diff[3];
+    mathVecSubtract(diff,myState,Target,3);
+    float dist = mathVecMagnitude(diff,3);
+    if ((dist < maxDist) && (dist > minDist)) {
+        result = true;
+    }
+    return result;
+}
+
+
+
+/*void moveByVelocity(float position[3],float factor) 
+{
+    mathVecSubtract(vectorBetween,position,&myState[0],3)
+    distance = mathVecMagnitude(vectorBetween, 3);
+    if (distance>0.6)
+    {
+        api.setVelocityTarget(vectorBetween)*factor;
+    }
+    else
+    {
+        api.setPositionTarget(position);
+    }
+}
+*/
+void setMagnitudeOfVector(float vector[3], float magnitude, bool normalise) {
+    /* Normalising a vector preserves its direction, but makes its magnitude
+     * one. If you then multiply it by a particular amount, that amount will
+     * become the magnitude.
+     * If you want to simply scale the vector, use normalise = false.
+     */
+    if (normalise) {
+        mathVecNormalize(vector, 3);
+    }
+    for (int i = 0; i < 3; i++) {
+        vector[i] = vector[i] * magnitude;
+    }
+}
+void moveByVelocity(float analyzer[3],float factor) 
+{
+    float Diff[3];
+    float factor_alt;
+    api.getMyZRState(myState);
+    if (myState[2] > 0.34)
+    {
+        api.setPositionTarget(analyzer);
+    }
+    else
+    {
+        mathVecSubtract(Diff,analyzer,&myState[0],3);
+        // limit vel mag demand to 0.05 m/s
+        if (mathVecMagnitude(Diff,3)*factor > 0.0525f)
+        {
+            factor_alt=0.0525f/mathVecMagnitude(Diff,3);
+            setMagnitudeOfVector(Diff,factor_alt,false);// limits the velocity mag to 0.05f
+        }
+            else
+        {
+            setMagnitudeOfVector(Diff,factor,false);// limits the velocity mag to 0.0575f
+        }
+        //DEBUG(("vel demanded: %4.3f %4.3f %4.3f",Diff[0],Diff[1],Diff[2]));
+        api.setVelocityTarget(Diff);
+    }
+}
