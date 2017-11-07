@@ -3,95 +3,239 @@ float myState[12];
 float drillLocation[3];
 float targetOrient[3];
 float zero[3];
-float analyzer[3];
 int counter;
 unsigned int state;
 unsigned int elapsedT;
 bool isBlue;
 bool isEven;
 bool isPenalty;
-int targetSquare;
-
-
-#define GETANALYZER 0
+bool samples[3];
+float tempOrientation;
+int targetSquare[3];
+float newTorque[3];
+bool oneTime;
+float lastScore;
+int counter4;
+int maxSamples;
+float torques2[3];
+float analyzer[3];
+float conc;
+#define START 0
 #define LOCATE 1
-#define CHECK 2
+#define DRILL 2
 #define ANALYZE 3
-#define DRILL 4
+#define DRILL2 4
 #define DROP 5
-void init(){
-    api.getMyZRState(myState);
-    state = GETANALYZER;
+
+void init()
+{
+    //This function is called once when your code is first loaded.
+	api.getMyZRState(myState);
+    state = START;
     analyzer[0] = 0.30f;
     analyzer[1] = -0.48f;
+    maxSamples = 2;
     analyzer[2] = -0.16f;
-	//This function is called once when your code is first loaded.
-if (myState[1] < 0)
-{
-    isBlue = false;
-    DEBUG(("RED"));
-}
-else 
-{
-    isBlue = true;
-    DEBUG(("BLUE"));
-    analyzer[0] = -analyzer[0];
-    analyzer[1] = -analyzer[1];
-}
-
+	
+	if (myState[1] < 0)
+	{
+		isBlue = false;
+		DEBUG(("GO RED"));
+	}
+	else 
+	{
+		isBlue = true;
+		DEBUG(("GO BLUE"));
+		analyzer[0] = -analyzer[0];
+		analyzer[1] = -analyzer[1];
+	}
+	counter4 = 0;
 	//IMPORTANT: make sure to set any variables that need an initial value.
 	//Do not assume variables will be set to 0 automatically!
 }
 
 void loop(){
     api.getMyZRState(myState);
+	elapsedT = api.getTime();
     switch(state)
     {
-        case GETANALYZER:
-        
-            moveByVelocity(analyzer,.27);
+        case START:
+            counter4 = 0;           
             if ((game.hasAnalyzer() == 1) || (game.hasAnalyzer() == 2))
             {
-                state = LOCATE;
+                conc = game.analyzeTerrain();
+                DEBUG(("Conc is %4.3f", conc));
+                drillLocation[0] = myState[0];
+                drillLocation[1] = myState[1];
+                drillLocation[2] = game.getTerrainHeight(&myState[0]) - .115f;
+                DEBUG(("Surface Height:  %4.3f", drillLocation[2]));
+				state = LOCATE;
+            }
+            else
+			{
+                moveByVelocity(analyzer,.27);
             }
         break;
         
         case LOCATE:
         
-            float maxZHeight[3];
-            float pos[2];
+            // float moon[2];
             float vectorBetween[3];
-            float distance;
+            float distance;          
+			//The surface has randomly assigned heights for each square, at heights of Z = [0.40, 0.48, 0.56, 0.64]m
             
-            maxZHeight[0] = myState[0];
-            maxZHeight[1] = myState[1];
-            maxZHeight[2] = 0.29f; //The surface has randomly assigned heights for each square, at heights of Z = [0.40, 0.48, 0.56, 0.64]m
-            
-            moveByVelocity(maxZHeight,0.125);
-            game.getTerrainHeight(pos);
-            DEBUG(("%f = pos",pos[2]));
-            
-            mathVecSubtract(vectorBetween,pos,myState,3);
+            //DEBUG(("%f = moon",moon[2]));
+			// api.setPositionTarget(drillLocation);
+            moveByVelocity(drillLocation,0.06f);            
+            mathVecSubtract(vectorBetween,drillLocation,&myState[0],3);
             distance = mathVecMagnitude(vectorBetween, 3);
-            DEBUG(("%f = distance", distance));
-            
-            if (isCloseEnough(myState,maxZHeight,0.00f,0.04f))
+            DEBUG(("%4.3f = distance", distance));
+            if (drillLocation[2]- myState[2] < 0.03f)
             {
-                state = CHECK;
+                state = DRILL;
+				DEBUG(("LOCATED, MOVING TO DRILL"));
             }
         break;
         
-        case CHECK:
+        case DRILL:
+			DEBUG(("STATE DRILL"));
+			if (elapsedT > 155 & game.getNumSamplesHeld() > 0) {
+			    game.stopDrill();
+			    state = DROP;
+			    break;
+			}
+			api.setPositionTarget(drillLocation);    // Keeps the satellite in one location so the velocity is under 0.01m/s
+			if ((game.getDrillEnabled() == false) && checkDrillReady(myState) && isCloseEnough(myState,drillLocation,0.0f,0.04f))
+			{
+				DEBUG(("starting DRILL"));
+				game.startDrill();
+				DEBUG(("checkSample %d", game.checkSample()));				
+			} 
+            if (game.getDrillEnabled() && (counter4 < 2))  //4
+			{
+               	float torques[3] = {0.0f,0.0f,0.7f}; // 0.5 // .24
+               	counter4++;	
+				DEBUG(("setting torques"));
+				api.setTorques(torques);
+			}
+			if (game.checkSample() && (game.getNumSamplesHeld() < maxSamples + 1 ))  // Checks if sample is ready for pickup. Constantly checks for this while the state keeps looping...
+			{    	       
+    	       game.pickupSample(); //Pick up sample 
+    	       DEBUG(("picked up sample"));
+			} 
+			DEBUG(("maxSamples in DRILL %d", maxSamples));
+			if (game.getNumSamplesHeld() == maxSamples || !isCloseEnough(myState,drillLocation,0.0f,0.04f) || game.isGeyserHere(targetSquare)) 
+			{
+			    game.stopDrill();
+			    if (game.isGeyserHere(targetSquare))
+			    {
+			     
+    			    DEBUG(("geyser adjustment"));
+        			zero[1] = -.08f;
+        			zero[2] = 7.5f;
+    			    api.setForces(zero);
+    			    state = DROP;
+			        break;
+			     //zero[2] = .2f;
+			     //   DEBUG(("geyser adjusment"));
+			     //   positionOffset(&myState[0], 0.15f, zero);
+			     //   moveByVelocity(zero, .9f);
+			     //   DEBUG(("zero %4.3f %4.3f %4.3f", zero[0], zero[1], zero[2])); 
+			     //   zero[2] = 0.0f;
+			    }
+
+			//state = ANALYZE;
+			state = DROP;
+			break;
+		}
+	
+    	break;	
         
-            DEBUG(("CHECK"));
+        case ANALYZE:
+			DEBUG(("STATE : ANALYZE"));	   
+			float zeroAtt[3];
+			zeroAtt[0]=0.0f;
+			zeroAtt[1]=0.0f;
+			zeroAtt[2]=0.0f;
+			api.setAttRateTarget(zeroAtt);
+			if (game.isGeyserHere(targetSquare) && (game.getNumSamplesHeld() > 0)) 
+			{
+				positionOffset(&myState[0], 0.22f, zero);
+				state = DROP;
+				break; 
+			}
+			if (abs(myState[9] < 0.02f) && abs(myState[10] < 0.04f)) 
+			{	
+				if ((game.getNumSamplesHeld() == 5))
+				{
+					positionOffset(&myState[0], 0.22f, zero);
+					state = DROP;
+				}
+				else  
+				{
+        	    state = DRILL2;
+        	    DEBUG(("Continue drilling "));
+				}        			
+			}
+    	break;
+	    
+	    case DROP:
+	    	DEBUG(("state DROP"));     
+			targetOrient[2]= -1.0f;
+			if (game.isGeyserHere(targetSquare) && counter < 2) // 3
+			{
+			    DEBUG(("geyser detection!"));
+			    DEBUG(("Zero : %f %f %f ", zero[0] , zero[1], zero[2]));
+			    api.setForces(zero);
+			}
+			DEBUG(("Target Orient : %f %f %f ", targetOrient[0] , targetOrient[1], targetOrient[2]));
+			api.setAttitudeTarget(targetOrient);
+		    if (myState[2] < 0) 
+			{
+		        zero[2] = -0.12f;
+		    }
+		    else 
+			{
+		        zero[2] = 0.12f;
+		    }
+		    DEBUG(("Zero:  %4.3f %4.3f %4.3f", zero[0], zero[1], zero[2]));
+            moveByVelocity(zero, 0.16f);
+            counter++;
+			if (game.atBaseStation() && myState[8] < -0.97f)
+			{			   
+			    game.getSamplesHeld(samples);
+			    for (int i = 0; i < 5; ++i) 
+				{
+			        if (samples[i]) 
+					{
+			            game.dropSample(i);
+			        }
+			    }
+			}
+			if ((game.getNumSamplesHeld() == 0))
+			{
+				counter = 0;
+				maxSamples = 2; 
+				state = START;
+			}
+		break;
 
-    }
-	//This function is called once per second.  Use it to control the satellite.
+		case DRILL2:	
+			DEBUG(("STATE DRILL2"));
+		     
+		     
+			//targetOrient[0] = 0;  // 0
+			//targetOrient[1] = 0; // -1
+			targetOrient[2] = 1;  // 0
+			//api.setAttitudeTarget(targetOrient);
+			//bottleAttitude(targetOrient);
+			DEBUG(("targetOrient %4.3f, %4.3f, %4.3f" , targetOrient[0], targetOrient[1], targetOrient[2]));
+			oneTime= false;
+			state = START;
+		break;
+	
+	}
 }
-
-
-
-
 bool isCloseEnough(float *myState, float *Target, float minDist, float maxDist) 
 {
     bool result = false;
@@ -104,7 +248,43 @@ bool isCloseEnough(float *myState, float *Target, float minDist, float maxDist)
     return result;
 }
 
+bool checkDrillReady(float myState[12])
+{
+    bool drillReady;
+    drillReady = false; 
+    float realVelocity = sqrt((myState[3]*myState[3])+(myState[4]*myState[4])+(myState[5]*myState[5]));
+    float rotationSpeed = sqrt((myState[9]*myState[9])+(myState[10]*myState[10])+(myState[11]*myState[11]));
+    DEBUG(("Real velocity: %f  Rot Speed %f ", realVelocity, rotationSpeed));
+    if ((realVelocity < 0.01f) && (rotationSpeed < 0.04f)) {
+        drillReady = true; 
+    }
+    DEBUG(("Drill Ready?: %d",drillReady));
+    return drillReady; 
+}
 
+void positionOffset(float currentPos[3], float offset, float destination[3]) 
+{
+    float offsetDir[3];
+    offsetDir[0] = destination[0] - currentPos[0];
+    offsetDir[1] = destination[1] - currentPos[1];
+    offsetDir[2] = destination[2] - currentPos[2];
+    mathVecNormalize(offsetDir, 3);
+    //float offsetTarget[3] = {0};
+    for (int i = 0; i < 3; ++i) 
+	{
+		destination[i] = 0.0f - (offset * offsetDir[i]); 
+    }
+}
+
+void bottleAttitude(float targVec[3]) 
+{
+    
+    float refVec[3] = {0.0f, 0.0f, -1.0f};
+    float baseQuat[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+    float targQuat[4];    
+    api.attVec2Quat(refVec, targVec, baseQuat, targQuat);
+	api.setQuatTarget(targQuat);
+}
 
 /*void moveByVelocity(float position[3],float factor) 
 {
