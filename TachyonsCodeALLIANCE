@@ -68,7 +68,6 @@ bool initDrill(float dest[3]) //get into position to start drilling
     moveFaster(targetPos);
     if(ready())
     {
-
         game.startDrill();
         api.setAttRateTarget(drillAttitude);
         return true;
@@ -113,7 +112,6 @@ void multVec(float *vec, float mult) {
 void moveFaster(float *whereTo) {
     float v[3]; //float mult;
     mathVecSubtract(v, whereTo, myState, 3.0f);
-    
     //mult = (1.0+1.0*(getMag(v)/0.6));
     multVec(v, 1.5);
     mathVecAdd(v, myState, v, 3);
@@ -140,9 +138,9 @@ void init(){
     
     // drilling locations
     myDest[0][0] = 0.2, myDest[0][1] = 0.2;
-    myDest[1][0] = -0.2, myDest[1][1] = 0.2, myDest[1][2] = 0.35;
-    myDest[2][0] = 0.10, myDest[2][1] = 0.2, myDest[2][2] = 0.35;
-    myDest[3][0] = -0.10, myDest[3][1] = 0.2, myDest[3][2] = 0.35;
+    myDest[1][0] = -0.2, myDest[1][1] = 0.2; //, myDest[1][2] = 0.35;
+    myDest[2][0] = 0.10, myDest[2][1] = 0.2; //, myDest[2][2] = 0.35;
+    myDest[3][0] = -0.10, myDest[3][1] = 0.2;    //, myDest[3][2] = 0.35;
     
     
 	isBlue = (myState[0] > 0);
