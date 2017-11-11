@@ -223,3 +223,55 @@ void loop(){
         break;
     }
 }
+
+bool isCloseEnough(float *myState, float *Target, float minDist, float maxDist) 
+{
+    bool result = false;
+    float diff[3];
+    mathVecSubtract(diff,myState,Target,3);
+    float dist = mathVecMagnitude(diff,3);
+    if ((dist < maxDist) && (dist > minDist)) {
+        result = true;
+    }
+    return result;
+}
+
+void setMagnitudeOfVector(float vector[3], float magnitude, bool normalise) {
+    /* Normalising a vector preserves its direction, but makes its magnitude
+     * one. If you then multiply it by a particular amount, that amount will
+     * become the magnitude.
+     * If you want to simply scale the vector, use normalise = false.
+     */
+    if (normalise) {
+        mathVecNormalize(vector, 3);
+    }
+    for (int i = 0; i < 3; i++) {
+        vector[i] = vector[i] * magnitude;
+    }
+}
+void moveByVelocity(float analyzer[3],float factor) 
+{
+    float Diff[3];
+    float factor_alt;
+    api.getMyZRState(myState);
+    if (myState[2] > 0.34)
+    {
+        api.setPositionTarget(analyzer);
+    }
+    else
+    {
+        mathVecSubtract(Diff,analyzer,&myState[0],3);
+        // limit vel mag demand to 0.05 m/s
+        if (mathVecMagnitude(Diff,3)*factor > 0.0525f)
+        {
+            factor_alt=0.0525f/mathVecMagnitude(Diff,3);
+            setMagnitudeOfVector(Diff,factor_alt,false);// limits the velocity mag to 0.05f
+        }
+            else
+        {
+            setMagnitudeOfVector(Diff,factor,false);// limits the velocity mag to 0.0575f
+        }
+        //DEBUG(("vel demanded: %4.3f %4.3f %4.3f",Diff[0],Diff[1],Diff[2]));
+        api.setVelocityTarget(Diff);
+    }
+}
