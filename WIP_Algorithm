@@ -1,0 +1,225 @@
+//Declare any variables shared between functions here
+float myState[12];
+float analyzer[3];
+unsigned int state;
+bool isBlue;
+float z1[3];
+float conc;
+float check1[3];
+float check2[3];
+float check3[3];
+float check4[3];
+float check5[3];
+float zero[3];
+float moon[2];
+
+//float nextCheck[3];
+
+
+#define GETANALYZER 0
+#define LOCATE 1
+#define CHECK 2
+#define CHECK2 3
+#define CHECK3 4
+#define CHECK4 5
+#define CHECK5 6
+#define FINDX 7
+#define DRILL 8
+#define DROP 9
+#define OTHERX 10
+
+void init(){
+    api.getMyZRState(myState);
+    state = GETANALYZER;
+    analyzer[0] = 0.30f;
+    analyzer[1] = -0.48f;
+    analyzer[2] = -0.16f;
+    
+    check1[0] = 0.44f;
+    check1[1] = -0.04f;
+    check1[2] = -0.16f;
+    
+    check2[0] = -0.04f;
+    check2[1] = -0.52f;
+    check2[2] = -0.16f;
+    
+    check3[0] = -0.20f;
+    check3[1] = -0.04f;
+    check3[2] = -0.16f;
+    
+    check4[0] = -0.20f;
+    check4[1] = -0.04f;
+    check4[2] = -0.16f;
+    
+    check5[0] = -0.28f;
+    check5[1] = -0.52f;
+    check5[2] = -0.16f;
+    
+	//This function is called once when your code is first loaded.
+    if (myState[1] < 0)
+    {
+        isBlue = false;
+        DEBUG(("RED"));
+    }
+    else 
+    {
+        isBlue = true;
+        DEBUG(("BLUE"));
+        analyzer[0] = -analyzer[0];
+        analyzer[1] = -analyzer[1];
+        check1[0] = -check1[0];
+        check1[1] = -check1[1];
+        check2[0] = -check2[0];
+        check2[1] = -check2[1];
+        check3[0] = -check3[0];
+        check3[1] = -check3[1];
+        check4[0] = -check4[0];
+        check4[1] = -check4[1];
+        check5[0] = -check5[0];
+        check5[1] = -check5[1];
+    }
+}
+
+void loop(){
+	//This function is called once per second.  Use it to control the satellite.
+	api.getMyZRState(myState);
+	conc = game.analyzeTerrain();
+	moon[0] = myState[0];
+	moon[1] = myState[1];
+	z1[0] = myState[0];
+    z1[1] = myState[1];
+    z1[2] = game.getTerrainHeight(moon) - .12f;
+    switch(state)
+    {
+        case GETANALYZER:
+        
+            DEBUG(("GETANALYZER"));
+            moveByVelocity(analyzer,0.350);
+            if ((game.hasAnalyzer() == 1) || (game.hasAnalyzer() == 2))
+            {
+                conc = game.analyzeTerrain();
+                DEBUG(("conc %4.3f",conc));
+                state = LOCATE;
+            }
+        break;
+        
+        case LOCATE:
+        
+            DEBUG(("LOCATE"));
+            DEBUG(("conc %4.3f",conc));
+            if(conc >= 0.30)
+            {
+                state = FINDX;
+                break;
+            }
+            else
+            {
+                state = CHECK;
+                break;
+            }
+        break;
+        
+        case CHECK:
+        
+            DEBUG(("CHECK"));
+            DEBUG(("conc %4.3f",conc));
+            DEBUG(("CHECK1"));
+            moveByVelocity(check1,0.075);
+            if (isCloseEnough(myState,check1,0.00f,0.04f))
+            {
+                DEBUG(("CHECK2"));
+                state = CHECK2;
+                break;
+            }
+            else if (conc >= 0.30)
+            {
+                state = FINDX;
+                break;
+            }
+        break;
+        
+        case FINDX:
+        
+            DEBUG(("FINDX"));
+            DEBUG(("conc %4.3f",conc));
+            myState[3] = 0.0f;
+            myState[4] = 0.0f;
+            myState[5] = 0.0f;
+            api.setPositionTarget(z1);
+            if (isCloseEnough(myState,z1,0.00f,0.04f))
+            {
+                
+            }
+            
+        break;
+        
+        case CHECK2:
+        
+            DEBUG(("CHECK2"));
+            DEBUG(("conc %4.3f",conc));
+            moveByVelocity(check2,0.075);
+            if (isCloseEnough(myState,check2,0.00f,0.04f))
+            {
+                DEBUG(("CHECK3"));
+                state = CHECK3;
+                break;
+            }
+            else if (conc >= 0.30)
+            {
+                    state = FINDX;
+                    break;
+            }
+            
+        break;
+        
+        case CHECK3:
+        
+            DEBUG(("CHECK3"));
+            DEBUG(("conc %4.3f",conc));
+            moveByVelocity(check3,0.075);
+            if(isCloseEnough(myState,check3,0.00f,0.04f))
+            {
+                DEBUG(("CHECK4"));
+                state = CHECK4;
+                break;
+            }
+            else if (conc >= 0.30)
+            {
+                state = FINDX;
+                break;
+            }
+            
+        break;
+        
+        case CHECK4:
+        
+            DEBUG(("CHECK4"));
+            DEBUG(("conc %4.3f",conc));
+            moveByVelocity(check4,0.075);
+            if(isCloseEnough(myState,check4,0.00f,0.04f))
+            {
+                DEBUG(("CHECK5"));
+                state = CHECK5;
+                break;
+            }
+            else if (conc >= 0.30)
+            {
+                state = FINDX;
+                break;
+            }
+            
+        break;
+        
+        case CHECK5:
+        
+            DEBUG(("CHECK5"));
+            DEBUG(("conc %4.3f",conc));
+            moveByVelocity(check5,0.075);
+            if (conc >= 0.30)
+            {
+                state = FINDX;
+                break;
+            }
+        break;
+    }
+}
