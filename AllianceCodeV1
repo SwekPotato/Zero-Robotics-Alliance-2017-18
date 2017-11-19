@@ -170,10 +170,26 @@ void init(){
     isBlue = (myState[0] > 0);
     factor = (isBlue) ? 1 : -1; // if red then search the other squares that are closest to red location
     DEBUG((" factor %d", factor));
-    for (int i = 1; i < 7; ++i) {
-        targetSquare[0] = i * factor;
-        for (int j = 4; j < 9; ++j) {
-            targetSquare[1] = j * factor;
+    // for (int i = 1; i < 7; ++i) {
+    //     targetSquare[0] = i * factor;
+    //     for (int j = 4; j < 9; ++j) {
+    //         targetSquare[1] = j * factor;
+    //         if (targetSquares[3][1] != 0) {
+    //             break;
+    //         }
+    //         if (game.getTerrainHeight(targetSquare) < 0.43f) {
+    //             targetSquares[counter][0] = i * factor;
+    //             targetSquares[counter][1] = j * factor;
+    //             DEBUG(("High targetSquare: %d %d", targetSquare[0], targetSquare[1]));
+    //             DEBUG(("Height %4.3f", game.getTerrainHeight(targetSquare)));
+    //             counter++;
+    //         }
+    //     }
+    // }
+    for (int j = 4; j < 9; ++j) {
+        targetSquare[1] = j * factor;
+        for (int i = 1; i < 7; ++i) {
+            targetSquare[0] = i * factor;
             if (targetSquares[3][1] != 0) {
                 break;
             }
@@ -232,7 +248,7 @@ void loop(){
 	    //    our current spot, we go back to base to drop off samples
 	    
 	    if((headingBase() && game.getOtherScore() < game.getScore()) ||
-	        (game.getDrills(pos2D) == 2 || game.isGeyserHere(pos2D)))
+	        (game.getDrills(pos2D) == 3 || game.isGeyserHere(pos2D)))
 	    {
 	        game.stopDrill();
 	        
