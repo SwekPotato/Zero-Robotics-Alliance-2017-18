@@ -1,0 +1,331 @@
+
+//End page Counter
+//Begin page Drill
+float targetQuat[4];
+float drillAttitude[3];
+
+// check whether drilling conditions are met 
+bool ready() {
+    if (fabs(myState[9]) >= 0.04 || fabs(myState[10]) >= 0.04) return false;
+    if (fabs(myState[11]) >= 0.04 || fabs(myState[3]) >= 0.01||fabs(myState[4]) >= 0.01) return false;
+    if (fabs(myState[5]) >= 0.01 || fabs(targetPos[0]-myState[0]) >= 0.02) return false;
+    if (fabs(targetPos[1]-myState[1]) >= 0.02 || fabs(targetPos[2]-myState[2]) >= 0.02) return false;
+    return true;
+}
+
+bool initDrill(float dest[3]) //get into position to start drilling
+{
+    DEBUG(("initDrill"));
+    float TMP[13];
+    api.getMySphState(TMP);
+    targetQuat[0]=TMP[6];
+    targetQuat[1]=TMP[7];
+    targetQuat[2]=0;
+    targetQuat[3]=0;
+    mathVecNormalize(targetQuat, 2);
+    api.setQuatTarget(targetQuat);
+    
+    targetPos[0] = dest[0];
+    targetPos[1] = dest[1];
+    targetPos[2] = dest[2];
+    if (game.getNumSamplesHeld() == 0) {
+      moveFaster(targetPos);
+    }
+    else {
+        targetPos[2] = .288f;
+        api.setPositionTarget(targetPos);
+    }
+    if(ready())
+    {
+        game.startDrill();                         // if ready then start drilling 
+        api.setAttRateTarget(drillAttitude);
+        return true;
+    }
+    return false;
+}
+
+void positionOffset(float currentPos[3], float offset, float destination[3])  // Used to "offset" the delivery location so the satellite delivers at the outskirts of the 
+                                                                              // delivery zone for improved efficiency (saves time and fuel)
+{
+    float offsetDir[3];
+    offsetDir[0] = destination[0] - currentPos[0];
+    offsetDir[1] = destination[1] - currentPos[1];
+    offsetDir[2] = destination[2] - currentPos[2];
+    mathVecNormalize(offsetDir, 3);
+    //float offsetTarget[3] = {0};
+    for (int i = 0; i < 3; ++i) 
+	{
+		destination[i] = 0.0f - (offset * offsetDir[i]); 
+    }
+}
+
+bool drill() //actually set angle then move to angle
+{
+    DEBUG(("drill func"));
+    if (game.isGeyserHere(pos2D)) { // initiate Geyser code
+	        
+	        step = -1;
+	 }
+    if (game.getDrillError())  // if there's an error stop and try again
+    {
+       DEBUG(("ERROR"));
+       game.stopDrill(); 
+       return false;
+    }
+    api.setPositionTarget(targetPos);
+    api.setAttRateTarget(drillAttitude);
+        
+    //if we have a sample
+    if (goOn) {            // used to fluctuate between drilling 2 samples at the first square and 3 more at the second... 
+        if (game.checkSample() && game.getNumSamplesHeld() < 3) {
+            // if we have too many samples
+            game.pickupSample();
+        }
+    }
+    else {
+        if (game.checkSample() && game.getNumSamplesHeld() < 5) {
+            // if we have too many samples
+            if (game.getNumSamplesHeld()== 5)
+                game.dropSample(4);
+            
+            game.pickupSample();
+        }
+    }
+    
+    return true;
+}
+//End page Drill
+//Begin page Movement
+float getMag(float *vel){
+    return sqrt(powf(vel[0],2)+powf(vel[1],2)+powf(vel[2],2));
+}
+void multVec(float *vec, float mult) {
+    vec[0] *= mult;
+    vec[1] *= mult;
+    vec[2] *= mult;
+}
+
+// Fastest move function to get where you're going fast
+void moveFaster(float *whereTo) {
+    float v[3]; //float mult;
+    DEBUG(("move FAST"));
+    mathVecSubtract(v, whereTo, myState, 3.0f);
+    //mult = (1.0+1.0*(getMag(v)/0.6));
+    multVec(v, 1.5);
+    mathVecAdd(v, myState, v, 3);
+    api.setPositionTarget(v);
+}
+
+bool isCloseEnough(float *myState, float Target[3], float minDist, float maxDist)  // boolean for how close we are to something
+{
+    bool result = false;
+    float diff[3];
+    mathVecSubtract(diff,myState,Target,3);
+    float dist = mathVecMagnitude(diff,3);
+    if ((dist < maxDist) && (dist > minDist)) {
+        result = true;
+    }
+    return result;
+}
+
+//End page Movement
+//Begin page main
+bool goOn;
+float myState[12];      // holds our state variables
+float temp;
+bool isBlue;            // whether we are blue
+bool farm;              // whether we are currently farming
+int step;               // step in counter control structure
+int targetSquare[2];
+int factor;
+int counter;
+float oppState[12];
+int counter3;
+bool id;
+int targetSquares[6][2]; // Stores 4 locations of squares[x,y] that have the highest height possible to save time
+float targetSquareLoc[2];
+float targetPos[3];     // value for holding current pos. target
+
+int destCnt;            // counter for myDest
+float pos2D[2];         // 2D position for checking geysers
+//float myDest[3][3];     // my drilling locations
+float dest[3];
+float baseStation[2][3];// base station while normal or geyser
+int tempSquare[3];
+
+void init(){
+    api.getMyZRState(myState);
+    DEBUG(("V2"))
+    counter = 0;
+    counter3 = 0; // for seeing if opp is blocking
+    goOn = true;
+    targetSquares[0][0] = 0;
+    targetSquares[0][1] = 0;
+    targetSquares[1][0] = 0;
+    targetSquares[1][1] = 0;
+    targetSquares[2][0] = 0;
+    targetSquares[2][1] = 0;
+    targetSquares[3][0] = 0;
+    targetSquares[3][1] = 0;
+    targetSquares[4][0] = 0;
+    targetSquares[4][1] = 0;
+    targetSquares[5][0] = 0;
+    targetSquares[5][1] = 0;
+    isBlue = (myState[0] > 0);
+    factor = (isBlue) ? 1 : -1; // if red then search the other squares that are closest to red location
+    for (int j = 4; j < 9; ++j) {
+        targetSquare[1] = j * factor;
+        for (int i = 1; i < 7; ++i) {
+            targetSquare[0] = i * factor;
+            if (targetSquares[5][1] != 0) {
+                DEBUG(("targetSquares[5][1] %d", targetSquares[5][1]));
+                break;
+            }
+            if (game.getTerrainHeight(targetSquare) < 0.43f) {
+                targetSquares[counter][0] = i * factor;
+                targetSquares[counter][1] = j * factor;
+                DEBUG(("High targetSquare: %d %d", targetSquare[0], targetSquare[1]));
+                DEBUG(("Height %4.3f", game.getTerrainHeight(targetSquare)));
+                counter++;
+            }
+        }
+    }
+
+	drillAttitude[2] = .7, drillAttitude[0] = drillAttitude[1] = 0;
+	baseStation[0][0] = baseStation[0][1] = 0, baseStation[0][2] = 0;
+	baseStation[1][0] = baseStation[1][1] = 0, baseStation[1][2] = 0.3;
+	
+	step = 1; destCnt = 0; farm = false;
+}
+
+void loop(){
+    DEBUG(("%d", step));
+    DEBUG((" %d", destCnt));
+	api.getMyZRState(myState);
+	
+	// 2D position for geysers and stuff
+	pos2D[0] = myState[0];
+	pos2D[1] = myState[1];
+	
+	// check conditions for driling
+	if(step==1) {
+	    DEBUG(("STEP 1"));
+	    DEBUG(("targetSquare in step 1: %d %d", targetSquares[0][0], targetSquares[0][1]));
+	    tempSquare[0] = targetSquares[destCnt][0];
+	    tempSquare[1] = targetSquares[destCnt][1];
+	    tempSquare[2] = 5;
+	    game.square2pos(tempSquare, dest);
+	    dest[2] = .268f;
+	    if(initDrill(dest))
+	        step = 2;
+	}
+	
+	// begin drilling at position
+	if(step==2)
+	{
+	    //if theres an error, start again
+	    DEBUG(("STEP 2"));
+	    
+	    api.setPositionTarget(dest);
+	    
+	    if (game.isGeyserHere(pos2D)) {
+	        step = -1;
+	    }
+	    
+	    if(!drill())
+	    {
+	        DEBUG(("Switchover"));
+	        step=1;
+	    }
+	    if ((game.getNumSamplesHeld() == 2) && goOn && (!game.isGeyserHere(pos2D)))
+	    {
+	        game.stopDrill();
+	        destCnt++;
+	        goOn = false;
+	        step = 1;
+	    }
+	    if ((game.getNumSamplesHeld() == 5) && (!game.isGeyserHere(pos2D))) {
+	        game.stopDrill();
+	        goOn = true;
+	        id = game.isGeyserHere(pos2D);
+	        positionOffset(&myState[0], 0.16f, baseStation[id]);
+	        step = 3;
+	    }
+	}
+	
+	// get to base station
+	if(step==3)
+	{
+	      DEBUG(("STEP 3"));
+	    // try to get back to base station
+	    // to drop off samples and initiate
+	    bool id = game.isGeyserHere(pos2D);
+	    api.getOtherZRState(oppState);
+		if (isCloseEnough(oppState,&baseStation[0][0],0.0f,.15f))
+		{
+			counter3++;
+		}
+		if (counter3 > 3)
+		{
+			    DEBUG(("Opponent squating at base"));
+			    game.dropSample(0);
+			    game.dropSample(1);
+			    game.dropSample(2);
+			    game.dropSample(3);
+			    step = 4;
+		}
+	    moveFaster(baseStation[id]);
+	    
+	    float attTarget[3];
+        attTarget[0] = 0;
+        attTarget[1] = 0;
+        attTarget[2] = -1; 
+        api.setAttitudeTarget(attTarget);
+        
+        if (game.atBaseStation()) 
+        {
+            for (int i = 0; i < 5; i++)
+                game.dropSample(i);
+            step = 4;
+        } else if (api.getTime() < 60 && game.getFuelRemaining() < 0.6) {
+            // if we did not get to the base station first and
+            // we are instead getting intercepted, begin farming
+            step = 1; farm = true; // 
+        }
+	}
+	
+	// handle interception
+	if(step==4)
+	{
+	    destCnt++;
+	    DEBUG(("STEP 4"));
+	    // if opponent ignores base station
+	    step = 1;
+	    
+	}
+	
+	if (step == -1) {
+	    DEBUG(("GEYSER CODE"));
+	    game.stopDrill();
+	    float forces[3];
+	    forces[0] = 0;
+	    if (isBlue) {
+	    forces[1] = -1; // -1
+	    }
+	    else {
+	        forces[1] = 1;
+	    } 
+	    forces[2] = 0;
+	    api.setForces(forces);
+	    if (!game.isGeyserHere(pos2D)) {
+	        forces[1] = 0;
+	        api.setAttRateTarget(forces);
+	        destCnt++;
+	        id = game.isGeyserHere(pos2D);
+	        positionOffset(&myState[0], 0.16f, baseStation[id]);
+	        step = 3;
+	    }
+	}
+}
+
+//End page main
