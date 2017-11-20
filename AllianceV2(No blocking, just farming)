@@ -15,6 +15,7 @@ bool ready() {
 
 bool initDrill(float dest[3]) //get into position to start drilling
 {
+    
     DEBUG(("initDrill"));
     float TMP[13];
     api.getMySphState(TMP);
@@ -134,7 +135,7 @@ bool goOn;
 float myState[12];      // holds our state variables
 float temp;
 bool isBlue;            // whether we are blue
-bool farm;              // whether we are currently farming
+             // whether we are currently farming
 int step;               // step in counter control structure
 int targetSquare[2];
 int factor;
@@ -155,7 +156,7 @@ int tempSquare[3];
 
 void init(){
     api.getMyZRState(myState);
-    DEBUG(("V2"))
+    DEBUG(("V2"));
     counter = 0;
     counter3 = 0; // for seeing if opp is blocking
     goOn = true;
@@ -195,10 +196,11 @@ void init(){
 	baseStation[0][0] = baseStation[0][1] = 0, baseStation[0][2] = 0;
 	baseStation[1][0] = baseStation[1][1] = 0, baseStation[1][2] = 0.3;
 	
-	step = 1; destCnt = 0; farm = false;
+	step = 1; destCnt = 0; 
 }
 
 void loop(){
+          id = game.isGeyserHere(pos2D);
     DEBUG(("%d", step));
     DEBUG((" %d", destCnt));
 	api.getMyZRState(myState);
@@ -247,7 +249,7 @@ void loop(){
 	    if ((game.getNumSamplesHeld() == 5) && (!game.isGeyserHere(pos2D))) {
 	        game.stopDrill();
 	        goOn = true;
-	        id = game.isGeyserHere(pos2D);
+	   
 	        positionOffset(&myState[0], 0.16f, baseStation[id]);
 	        step = 3;
 	    }
@@ -290,7 +292,7 @@ void loop(){
         } else if (api.getTime() < 60 && game.getFuelRemaining() < 0.6) {
             // if we did not get to the base station first and
             // we are instead getting intercepted, begin farming
-            step = 1; farm = true; // 
+            step = 1;  // 
         }
 	}
 	
@@ -321,7 +323,7 @@ void loop(){
 	        forces[1] = 0;
 	        api.setAttRateTarget(forces);
 	        destCnt++;
-	        id = game.isGeyserHere(pos2D);
+	  
 	        positionOffset(&myState[0], 0.16f, baseStation[id]);
 	        step = 3;
 	    }
