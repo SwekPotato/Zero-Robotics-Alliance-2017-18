@@ -1,28 +1,25 @@
 //Begin page Drill
-// This code scored 79 points once :O
-// So it's probably pretty good. Try improving it
-
 float targetQuat[4];
 
 // check whether drilling conditions are met 
 bool ready() {
-    if (fabs(myState[9]) >= 0.04 || fabs(myState[10]) >= 0.04) return false;
-    if (fabs(myState[11]) >= 0.04 || fabs(myState[3]) >= 0.01 || fabs(myState[4]) >= 0.01) return false;
-    if (fabs(myState[5]) >= 0.01 || fabs(targetPos[0]-myState[0]) >= 0.02) return false;
-    if (fabs(targetPos[1]-myState[1]) >= 0.02 || fabs(targetPos[2]-myState[2]) >= 0.02) return false;
+    if (fabs(myState[9]) >= 0.04f || fabs(myState[10]) >= 0.04f) return false;
+    if (fabs(myState[11]) >= 0.04f || fabs(myState[3]) >= 0.01f || fabs(myState[4]) >= 0.01f) return false;
+    if (fabs(myState[5]) >= 0.01f || fabs(targetPos[0]-myState[0]) >= 0.02f) return false;
+    if (fabs(targetPos[1]-myState[1]) >= 0.02f || fabs(targetPos[2]-myState[2]) >= 0.02f) return false;
     return true;
 }
 
 bool initDrill(float dest[3]) //get into position to start drilling
 {
-    
     DEBUG(("initDrill"));
     float TMP[13];
     api.getMySphState(TMP);
     targetQuat[0]=TMP[6];
     targetQuat[1]=TMP[7];
-    targetQuat[2]=0;
-    targetQuat[3]=0;
+    targetQuat[2]=0.0f;
+    targetQuat[3]=0.0f;
+    
     mathVecNormalize(targetQuat, 2);
     api.setQuatTarget(targetQuat);
     
@@ -72,7 +69,7 @@ bool drill() //actually set angle then move to angle
        return false;
     }
     float drillAttitude[3];
-    drillAttitude[2] = .80, drillAttitude[0] = drillAttitude[1] = 0;
+    drillAttitude[2] = .80f, drillAttitude[0] = drillAttitude[1] = 0.0f;
 
     api.setPositionTarget(targetPos);
     api.setAttRateTarget(drillAttitude);
@@ -141,20 +138,23 @@ bool isCloseEnough(float *myState, float Target[3], float minDist, float maxDist
 }
 
 int selectSquare(int targetSquares[10][2]) {       // function that returns the index of the closest square from the array of targetSquares
-    float dist;
-    float distTmp =10;
+    float dist = 10;
+    float distTmp; 
     int index = 0;
-    for (int j = 0; j < 10; ++j) {
+    for (int j = 0; j < 10 || targetSquares[j][0] == 0; ++j) {
         if ((game.getDrills(targetSquares[j]) == 0) && (targetSquares[j][0] != 0) && (!game.isGeyserHere(targetSquares[j]))) // only check the square if there's no geyser there and we haven't drilled there before
         {
             float posSq[3]; 
             game.square2pos(targetSquares[j], posSq); // get the position of the square we're checking
             mathVecSubtract(posSq,posSq,&myState[0],3); // find the vector between the position of the square and myState
-            dist = mathVecMagnitude(posSq, 3);
-            if (dist < distTmp);
+            distTmp = mathVecMagnitude(posSq, 3);
+            if (distTmp < dist);
             {
-                distTmp=dist;
+                dist = distTmp;
                 index=j;
+                if (dist < .16f) {
+                    break;
+                }
             }
         }
     }
@@ -168,8 +168,10 @@ float myState[12];      // holds our state variables
 bool isBlue;            // whether we are blue
              // whether we are currently farming
 int step;// step in counter control structure
+int factor; 
+int counter;
+int counter2;
 
-int counter3;
 int targetSquares[10][2]; // Stores 4 locations of squares[x,y] that have the highest height possible to save time
 float targetPos[3];     // value for holding current pos. target
 int index;              // index value for current target square from targetSquares
@@ -180,34 +182,33 @@ float dest[3];
 
 void init(){
     api.getMyZRState(myState);
-    DEBUG(("CoSmIc TaCo v3 11/23"));
-    int counter = 0;
-    counter3 = 0; // for seeing if opp is blocking
+    DEBUG(("CoSmIc TaCo 11/24"));
+     counter = 0;
+     counter2 = 0; 
     goOn = true;
-    
     for (int i = 0; i < 10; i++) 
         targetSquares[i][0] = targetSquares[i][1] = 0;
-
-
-    isBlue = (myState[0] > 0);
-    int factor = (isBlue) ? 1 : -1; // if red then search the other squares that are closest to red location
     
+    isBlue = (myState[0] > 0);
+    factor = (isBlue) ? 1 : -1; // if red then search the other squares that are closest to red location
     int targetSquare[2];
-    for (int j = 3; j < 6; ++j) {
-        targetSquare[1] = j * factor;
-        for (int i = -3; i < 6 || targetSquares[9][1] != 0; ++i) {
-            targetSquare[0] = i * factor;
-            if (game.getTerrainHeight(targetSquare) < 0.43f) {
-                targetSquares[counter][0] = i * factor;
-                targetSquares[counter][1] = j * factor;
-                DEBUG(("targetSquares %d %d", targetSquares[counter][0], targetSquares[counter][1]));
-                counter++;
+    
+    for (int j = -2; j < 6; ++j) { // Y coord // 7
+            for (int i = -2; i < 6 || targetSquares[9][1] != 0; ++i) { // i = X coord
+                if (!(abs(i) < 3 && abs(j) < 3) && (i != 0) && (j != 0)) {
+                        targetSquare[1] = j * factor; // temp variable used to check square height 
+                        targetSquare[0] = i * factor;
+                        if (game.getTerrainHeight(targetSquare) < 0.43f) {
+                            targetSquares[counter][0] = i * factor;
+                            targetSquares[counter][1] = j * factor;
+                            DEBUG(("targetSquares %d %d", targetSquares[counter][0], targetSquares[counter][1]));
+                            counter++;
+                        }
+                }
             }
-        }
     }
-    index = selectSquare(targetSquares);
-    DEBUG(("test %d", index));
-	step = 1; 
+    
+	step = 0; 
 }
 
 void loop(){
@@ -222,6 +223,12 @@ void loop(){
 	pos2D[1] = myState[1];
 	bool geyser = game.isGeyserHere(pos2D);
 	
+	if (step == 0) {
+    	
+        index = selectSquare(targetSquares);
+        DEBUG(("test %d", index));
+        step = 1;
+	}
 	// check conditions for driling
 	if(step==1) {
 	    DEBUG(("STEP 1"));
@@ -248,11 +255,11 @@ void loop(){
         int samplesHeld = game.getNumSamplesHeld();
         int timePassed = api.getTime();
 	    
-        if (timePassed > 160 && timePassed < 167 && samplesHeld > 1) {
-            game.stopDrill(); 
-            positionOffset(&myState[0], 0.24f, baseStation);
-            step = 3;
-        }
+        // if (timePassed > 160 && timePassed < 167 && samplesHeld > 1) {
+        //     game.stopDrill(); 
+        //     positionOffset(&myState[0], 0.24f, baseStation);
+        //     step = 3;
+        // }
 	    
         if(!drill())
         {
@@ -261,7 +268,33 @@ void loop(){
 	    }
 	    
         if (geyser) {
-            step = -1;
+                 DEBUG(("GEYSER CODE"));
+    	         game.stopDrill();
+    	    
+        	    float forces[3];
+        	    forces[0] = (myState[0] < 0 ? 2 : -2);  // 2, -2
+        	    forces[2] = 0;
+        	    forces[1] = (isBlue ? -5 : 5);   // -5, 5
+                if (counter2 < 2) {
+                    DEBUG(("setting forces"));
+        	        api.setForces(forces);
+        	        counter2++;
+                }
+        	    else {
+        	        forces[1] = 0;
+        	        api.setAttRateTarget(forces);
+        	  
+        	       // positionOffset(&myState[0], 0.16f, baseStation);
+        	       // step = 3;
+        	       if (game.getNumSamplesHeld() < 3) {
+        	           counter2 = 0; index = selectSquare(targetSquares); goOn = false; step = 1;
+        	       }
+        	       else {
+        	           counter2 = 0; positionOffset(&myState[0], 0.20f, baseStation);
+        	           step = 3;
+        	       }
+	       
+	            }
         }
 	    
 	    else if ((samplesHeld == 3) && goOn)
@@ -293,10 +326,7 @@ void loop(){
 	    // opponent has been in the base for 3 seconds or longer????? instead, i would
 	    // like to propose that we only go back to the base station when the opponent
 	    // is not occupying, or something similar to that sort
-	    
-		if ((counter3 += isCloseEnough(oppState,&baseStation[0],0.0f,.15f)) > 3) {
-		    index = selectSquare(targetSquares); step = 1; return;
-		}
+	   
 
 
 	    moveFaster(baseStation);
@@ -322,21 +352,7 @@ void loop(){
 	
 	
 	if (step == -1) {
-	    DEBUG(("GEYSER CODE"));
-	    game.stopDrill();
-	    
-	    float forces[3];
-	    forces[0] = forces[2] = 0;
-	    forces[1] = (isBlue ? -.4 : .4);
-
-	    api.setForces(forces);
-	    if (!geyser) {
-	        forces[1] = 0;
-	        api.setAttRateTarget(forces);
-	  
-	        positionOffset(&myState[0], 0.16f, baseStation);
-	        step = 3;
-	    }
+	   
 	}
 }
 
