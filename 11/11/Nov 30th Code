@@ -25,7 +25,7 @@ bool initDrill(float dest[3]) //get into position to start drilling
     
     targetPos[0] = dest[0];
     targetPos[1] = dest[1];
-    targetPos[2] = dest[2];
+    //targetPos[2] = dest[2];
     
     /* transformation starting on line 39
     if (game.getNumSamplesHeld() == 0) {
@@ -36,11 +36,11 @@ bool initDrill(float dest[3]) //get into position to start drilling
         moveFaster(targetPos);
     }*/
     
-    if (game.getNumSamplesHeld() != 0)
-        targetPos[2] = 0.285f;//0.265
-    moveFaster(targetPos, 1.4f);
+    //if (game.getNumSamplesHeld() != 0)
+        targetPos[2] = 0.255f;//0.265
+    moveFaster(targetPos, 1.7f);
     
-    if(ready())
+    if(ready() && myState[2] >= .252f)
     {
         game.startDrill();                         // if ready then start drilling
         return true;
@@ -69,9 +69,10 @@ bool drill() //actually set angle then move to angle
        return false;
     }
     float drillAttitude[3];
-    drillAttitude[2] = .80f, drillAttitude[0] = drillAttitude[1] = 0.0f;
+    drillAttitude[2] = .85f, drillAttitude[0] = drillAttitude[1] = 0.0f;
 
     api.setPositionTarget(targetPos);
+    DEBUG(("myState Z %4.3f", myState[2]));
     api.setAttRateTarget(drillAttitude);
         
     /* // From editor: I dont really get thiis code :/
@@ -137,7 +138,7 @@ bool isCloseEnough(float *myState, float Target[3], float minDist, float maxDist
 }
 
 int selectSquare(int targetSquares[10][2]) {       // function that returns the index of the closest square from the array of targetSquares
-    float dist = 10.0f;
+    float dist = 100.0f;
     float distTmp; 
     int index = 0;
     for (int j = 0; j < counter; ++j) { // 10
@@ -147,12 +148,13 @@ int selectSquare(int targetSquares[10][2]) {       // function that returns the 
             game.square2pos(targetSquares[j], posSq); // get the position of the square we're checking
             mathVecSubtract(posSq,posSq,&myState[0],3); // find the vector between the position of the square and myState
             distTmp = mathVecMagnitude(posSq, 3);
-            DEBUG(("Index=  %d , Prev distance = %4.3f, This dist = %4.3f", j,dist, distTmp));
-            if (distTmp < dist);
+            //DEBUG(("Index=  %d , Prev distance = %4.3f, This dist = %4.3f", j,dist, distTmp));
+            if (10 * distTmp < 10 * dist)
             {
+                //DEBUG(("Confirmed %4.3f is less than %4.3f", distTmp, dist));
                 dist = distTmp;
                 index=j;
-                DEBUG(("Holding Index=  %d , Min distance = %4.3f", j, dist));
+                //DEBUG(("Holding Index=  %d , Min distance = %4.3f", j, dist));
                 if (dist < .16f) {
                     break;
                 }
@@ -184,7 +186,7 @@ float baseStation[3];
 
 void init(){
     api.getMyZRState(myState);
-    DEBUG(("CoSmIc TaCo 11/30"));
+    DEBUG(("CoSmIc TaCo 11/30s"));
     forces[0]=0;
     forces[1]=0;
     forces[2]=0;
@@ -230,8 +232,8 @@ void loop(){
 	
 	if (step == 0) {
     	
-        index = selectSquare(targetSquares);
-        DEBUG(("Index %d", index));
+        index=selectSquare(targetSquares);
+        DEBUG((" Index Selected: %d", index));
         step = 1;
 	}
 	// check conditions for driling
@@ -243,7 +245,7 @@ void loop(){
 	    tempSquare[2] = 5;
 	    DEBUG(("targetSquare in step 1: %d,  %d", tempSquare[0], tempSquare[1]));
 	    game.square2pos(tempSquare, dest);
-	    dest[2] = .263f;//0.263f
+	    dest[2] = .255f;//0.263f
 	    if(initDrill(dest))
 	        step = 2;
 	}
@@ -267,7 +269,7 @@ void loop(){
         if(!drill())
         {
             DEBUG(("Switchover"));
-            step=0; //1
+            step = 1; //1 // 0
 	    }
 	    
 	    
@@ -292,6 +294,10 @@ void loop(){
         	    forces[0] = (targetSquares[index][0] - targetSquares[temp][0] <= 0 ? 0.2f : -0.2f);  // 2, -2
         	    forces[1] = (targetSquares[index][1] - targetSquares[temp][1] <= 0 ? 0.2f : -0.2f);   // -5, 5
         	    forces[2] = 0.2f;
+        	    if (game.getNumSamplesHeld() >= 3) { // if going for delivery
+        	        forces[0] = (!isBlue ? 0.2f : -0.2f);
+        	        forces[1] = (!isBlue ? 0.2f : -0.2f);
+        	    }
         	    DEBUG(("Divert Forces Corrected: %4.3f , %4.3f, %4.3f", forces[0],forces[1],forces[2]));
         	}
         	    
@@ -312,7 +318,7 @@ void loop(){
         	       
         	        // positionOffset(&myState[0], 0.16f, baseStation);
         	        // step = 3;
-        	    if (game.getNumSamplesHeld() < 4)
+        	    if (game.getNumSamplesHeld() < 3) // 4
         	    {
         	        goOn = false; step = 0; // index = selectSquare(targetSquares);
         	    }
@@ -355,18 +361,18 @@ void loop(){
 	    // like to propose that we only go back to the base station when the opponent
 	    // is not occupying, or something similar to that sort
 	   
-	    if (isCloseEnough(oppState, baseStation, 0.0f, 0.20f)) {
-	        counter3++;
-	    }
-	    if (counter3 > 5) {
-	        for (int j = 0; j < 5; ++j) {
-	            game.dropSample(j);
-	        }
-	        counter3 = 0;
-	        index = selectSquare(targetSquares);
-	        goOn = true;
-	        step = 1;
-	    }
+	   // if (isCloseEnough(oppState, baseStation, 0.0f, 0.20f)) { // anti-blocking code (adds +8 percent codesize)
+	   //     counter3++;
+	   // }
+	   // if (counter3 > 5) {
+	   //     for (int j = 0; j < 5; ++j) {
+	   //         game.dropSample(j);
+	   //     }
+	   //     counter3 = 0;
+	   //     index = selectSquare(targetSquares);
+	   //     goOn = true;
+	   //     step = 1;
+	   // }
 
 
 	    moveFaster(baseStation, 1.10f);
